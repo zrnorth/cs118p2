@@ -15,6 +15,7 @@
 #include "packet.h"
 #define RECEIVER_PORT 8080 // for testing and stuff
 
+char* output_file; // Global. keeps track of the name of the file we are writing to
 
 
 void error(char *msg)
@@ -72,6 +73,24 @@ void sendAckPacket(int packet_to_ack,
     free(sp);
 }
 
+// Puts the packet's information into the output file.
+void putIntoFile(int length, char* raw_pkt)
+{
+    int i;
+    for(i = HEADER_SIZE; i < length; i++)
+    {
+        // get 1 byte at a time and write to file
+        char byte = *(raw_pkt + i);
+
+        //TODO debug
+        printf("%c\n", byte);
+        //end TODO
+
+        fprintf(output_file, "%c", byte);
+        fflush(stdout); //just in case
+    }
+}
+
 int main(int argc, char *argv[])
 {
     int sockfd; //Socket descriptor
@@ -101,6 +120,12 @@ int main(int argc, char *argv[])
     server = gethostbyname(sender_hostname);
     if (!server) error("hostname lookup failed");
 
+    // Setup the file to be written to. Call it "out-" + filename
+    char* output;
+    asprintf(&output, "%s%s", "out-", filename);
+    output_file = fopen(output, "w"); // shouldn't fail because opening for writing
+    free(output);
+
     // Send the initial request packet
     sendRequestPacket(filename, sockfd, si_sender);
 
@@ -111,8 +136,11 @@ int main(int argc, char *argv[])
 
     //Debug: just receive one and print it.
     recvfrom(sockfd, pkt, PACKET_SIZE, 0, (struct sockaddr*) &si_sender, &slen);
-    printf("%s\n", pkt);
-
+    printf("Packet received: %x\n", pkt);
+    packet_t p = deserialize_packet(pkt);
+    printf("Packet length: %i\n", p.packet_length);
+    sendAckPacket(p.packet_num, sockfd, si_sender);
+    putIntoFile(p.packet_length, pkt);
 
     close(sockfd);
     return 0;

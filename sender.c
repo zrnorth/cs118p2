@@ -175,6 +175,8 @@ void sendPacket(int packet_num)
     // copy in the data
     memcpy(p.data, file_buffer+(packet_num * DATA_SIZE), length);
 
+    p.packet_length = length + HEADER_SIZE;
+
     // Serialize the packet to be sent
     char* sp = serialize_packet(p);
 
@@ -229,6 +231,7 @@ int processFile(char* rcvd_pkt)
     }
     else if (p.type == TYPE_ACK) // acking a packet that was sent
     {
+        printf("Received ACK\n");
         // TODO do nothing for now
     }
     else // wrong packet sent
