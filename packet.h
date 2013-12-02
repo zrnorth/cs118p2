@@ -25,9 +25,9 @@
 #define PACKET_SIZE   1000
 #define HEADER_SIZE   21 // size of the non-data elements of a packet
 #define DATA_SIZE (PACKET_SIZE - HEADER_SIZE)
-#define TYPE_REQUEST  0
-#define TYPE_MESSAGE  1
-#define TYPE_ACK      2
+#define TYPE_REQUEST  0x00
+#define TYPE_MESSAGE  0x01
+#define TYPE_ACK      0x10
 
 typedef struct PACKET {
   unsigned int source_port;
