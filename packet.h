@@ -22,6 +22,13 @@
     21-999      Data              The actual data in the packet.
 */
 
+#define PACKET_SIZE   1000
+#define HEADER_SIZE   21 // size of the non-data elements of a packet
+#define TYPE_REQUEST  0
+#define TYPE_MESSAGE  1
+#define TYPE_ACK      2
+
+
 struct PACKET {
   unsigned int source_port;
   unsigned int dest_port;
@@ -30,7 +37,4 @@ struct PACKET {
   unsigned int packet_length;
   unsigned int checksum;
   char data[978];
-}
-
-
-
+};
