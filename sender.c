@@ -210,11 +210,21 @@ int main(int argc, char* argv[])
     }
 
     // Only listen on up to 5 processes at a time.
-    listen(sockfd, 5);
+    //listen(sockfd, 5);
 
-    clilen = sizeof(cli_addr);
 
-    // Reap all of the zombie processes that have finished their request and
+	char* buffer[PACKET_SIZE];
+	if (recvfrom(sockfd, buffer, PACKET_SIZE, 0, &cli_addr, &clilen) < 0)
+	{
+		error("ERROR on receive from");
+	}
+	else
+	{
+		printf("Received Data: %s\n", buffer);
+	}
+    //clilen = sizeof(cli_addr);
+
+/*    // Reap all of the zombie processes that have finished their request and
     // received their response.
     sig_action.sa_handler = connection_handler;
     sigemptyset(&sig_action.sa_mask);
@@ -252,6 +262,6 @@ int main(int argc, char* argv[])
             close(newsockfd);
         }
     }
-
+*/
     return 0;
 }
