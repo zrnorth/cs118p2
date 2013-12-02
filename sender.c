@@ -1,7 +1,7 @@
 /**
  * Zach North - 603 885 768
  * Rory Snively - 803 889 336
- * 
+ *
  * CS 118 - Project 1
  * UCLA, Fall 2013
  *
@@ -59,8 +59,6 @@ char* not_found_response(char* request)
 	packet_t p_req = deserialize_packet(request);
 	packet_t p_res;
 
-	p_res.source_port = p_req.dest_port;
-	p_res.dest_port = p_req.source_port;
 	p_res.type = TYPE_MESSAGE;
 	p_res.packet_num = 0;
 
@@ -76,8 +74,6 @@ char* found_response(char* request)
 	packet_t p_req = deserialize_packet(request);
 	packet_t p_res;
 
-	p_res.source_port = p_req.dest_port;
-	p_res.dest_port = p_req.source_port;
 	p_res.type = TYPE_MESSAGE;
 	p_res.packet_num = 0;
 
@@ -92,7 +88,7 @@ char* handle_request(char* request)
 {
 
     /** Generate the response message **/
-    
+
     char* response_msg = malloc(PACKET_SIZE);
 
     // Get the desired file.
@@ -129,7 +125,7 @@ printf("3\n");
         // Read contents of file.
         char* file_contents = malloc(file_size * sizeof(char));
         size_t amount_read = fread(file_contents, 1, file_size, f);
-        
+
         // Determine the type of data being delivered.
         char* file_extension = get_file_extension(filename);
         char* content_type = get_content_type(file_extension);
@@ -152,16 +148,105 @@ printf("3\n");
     }
 }
 
+int file_size; // global; holds the size of the file in bytes
+char* file_buffer; //Global; holds the file to be served.
+int max_num_pkts; // Global; holds the number of packets in the file.
+int sockfd, newsockfd, portno, pid;
+socklen_t clilen;
+struct sockaddr_in serv_addr, cli_addr;
+
+// helper function
+int min(int a, int b)
+{
+    if (a < b) return a;
+    else return b;
+}
+
+// Sends a packet on the wire to the receiver
+void sendPacket(int packet_num)
+{
+    packet_t p;
+    p.type = TYPE_MESSAGE;
+    p.packet_num = packet_num;
+    p.checksum = 0; // todo
+
+    // need to get the length of the packet (usually 1000, unless last pkt.)
+    size_t length = min(DATA_SIZE, file_size - (packet_num * DATA_SIZE));
+    // copy in the data
+    memcpy(p.data, file_buffer+(packet_num * DATA_SIZE), length);
+
+    // Serialize the packet to be sent
+    char* sp = serialize_packet(p);
+
+    // Send the packet
+    printf("Sending packet #%i\n", packet_num);
+    sendto(sockfd, sp, HEADER_SIZE + length, 0, (struct sockaddr*)&cli_addr, clilen);
+}
+
+
+// Subroutine of processFile that checks if a file exists.
+// If it does, reads the file contents into a buffer.
+// Else returns null.
+void getFile(char* filename)
+{
+    FILE* fp = fopen(filename, "r");
+    if (fp == NULL)
+    {
+        error("File not found.");
+    }
+
+    // Get the total length of the file
+    fseek(fp, 0, SEEK_END);
+    file_size = ftell(fp);
+    fseek(fp, 0, SEEK_SET);
+
+    // Create a buffer and copy over the bytes
+    file_buffer = malloc(file_size);
+    fread(file_buffer, 1, file_size, fp);
+
+    // Need to determine number of packets to send
+    max_num_pkts = file_size / DATA_SIZE;
+    if (file_size % DATA_SIZE != 0)
+        max_num_pkts++; //one more packet to get the remaining needed.
+
+    fclose(fp);
+}
+// Checks if a file exists in the system and serves it; else returns error.
+int processFile(char* rcvd_pkt)
+{
+    // Deserialize the packet into a struct to make it easier to read.
+    packet_t p = deserialize_packet(rcvd_pkt);
+    if (p.type == TYPE_REQUEST) // looking for a file.
+    {
+        char* filename = p.data;
+        printf("Received request for file %s\n", filename);
+
+        getFile(filename);
+
+        // Serve the file, one packet at a time. Return 1 when done
+        // TODO for now just send one packet
+        sendPacket(0);
+    }
+    else if (p.type == TYPE_ACK) // acking a packet that was sent
+    {
+        // TODO do nothing for now
+    }
+    else // wrong packet sent
+    {
+        printf("Error: wrong packet type received\n");
+    }
+    return 0;
+}
+
+// Reset starts the timers over
+void reset()
+{
+    // TODO implement
+}
 // Establishes the given socket as an access point to our server. Then spawns
 // off processes for each connection that is made to serve the proper response.
 int main(int argc, char* argv[])
 {
-    // Initialize connection to port using the given socket.
-    int sockfd, newsockfd, portno, pid;
-    socklen_t clilen;
-    struct sockaddr_in serv_addr, cli_addr;
-    struct sigaction sig_action;
-
     // Make sure the arguments are correctly supplied.
     if (argc < 2)
     {
@@ -175,7 +260,7 @@ int main(int argc, char* argv[])
     {
         error("ERROR opening socket");
     }
-    
+
     // Establish correspondence between socket and supplied port number.
     bzero((char *) &serv_addr, sizeof(serv_addr));
     portno = atoi(argv[1]);
@@ -190,14 +275,20 @@ int main(int argc, char* argv[])
     // Only listen on up to 5 processes at a time.
     //listen(sockfd, 5);
 
-
+    int finishedTransmitting;
 	char* buffer[PACKET_SIZE];
-	if (recvfrom(sockfd, buffer, PACKET_SIZE, 0, &cli_addr, &clilen) < 0)
+    clilen = sizeof(cli_addr);
+	while(1)
 	{
-		error("ERROR on receive from");
-	}
-	else
-	{
+        recvfrom(sockfd, buffer, PACKET_SIZE, 0, (struct sockaddr*)&cli_addr, &clilen);
+        finishedTransmitting = processFile(buffer);
+        if (finishedTransmitting)
+        {
+            printf("done\n");
+            reset();
+        }
+    }
+}
 /*
 		packet_t p = deserialize_packet(buffer);
 		printf("Source Port: %d\n", p.source_port);
@@ -207,10 +298,10 @@ int main(int argc, char* argv[])
 		printf("Packet Length: %d\n", p.packet_length);
 		printf("Checksum: %d\n", p.checksum);
 		printf("Data: %s\n", p.data);
-*/		
+
 
 		char* response = handle_request(buffer);
-		if (sendto(sockfd, response, PACKET_SIZE, 0, &cli_addr, clilen) < 0)
+		if (sendto(sockfd, response, PACKET_SIZE, 0, (struct sockaddr*) &cli_addr, clilen) < 0)
 		{
 			error("ERROR on response sending");
 		}
@@ -220,7 +311,7 @@ int main(int argc, char* argv[])
 		}
 	}
     //clilen = sizeof(cli_addr);
-
+*/
 /*    // Reap all of the zombie processes that have finished their request and
     // received their response.
     sig_action.sa_handler = connection_handler;
@@ -259,6 +350,7 @@ int main(int argc, char* argv[])
             close(newsockfd);
         }
     }
-*/
+
     return 0;
 }
+*/

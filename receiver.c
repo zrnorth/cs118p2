@@ -27,7 +27,6 @@ void error(char *msg)
 // This is the "initial" packet that starts the chain
 void sendRequestPacket(char *filename,
                        int sockfd,
-                       unsigned int sender_port,
                        struct sockaddr_in si_sender)
 {
     // Construct a request packet
@@ -37,8 +36,6 @@ void sendRequestPacket(char *filename,
 
     strcpy(request_packet.data, filename);
     request_packet.packet_length = sizeof(filename) + HEADER_SIZE;
-    request_packet.source_port = RECEIVER_PORT;
-    request_packet.dest_port = sender_port;
     request_packet.type = TYPE_REQUEST;
     request_packet.packet_num = 0;
     request_packet.checksum = 0;
@@ -55,15 +52,12 @@ void sendRequestPacket(char *filename,
 
 void sendAckPacket(int packet_to_ack,
                    int sockfd,
-                   unsigned int sender_port,
                    struct sockaddr_in si_sender)
 {
     // Construct the ack packet
     packet_t ack_packet;
     // the data element in the ack packet is null, because just sending ack
     ack_packet.packet_length = HEADER_SIZE;
-    ack_packet.source_port = RECEIVER_PORT;
-    ack_packet.dest_port = sender_port;
     ack_packet.type = TYPE_ACK;
     ack_packet.packet_num = packet_to_ack;
     ack_packet.checksum = 0; //TODO implement checksum
@@ -108,7 +102,7 @@ int main(int argc, char *argv[])
     if (!server) error("hostname lookup failed");
 
     // Send the initial request packet
-    sendRequestPacket(filename, sockfd, sender_portnumber, si_sender);
+    sendRequestPacket(filename, sockfd, si_sender);
 
     // Now waiting for packet back from sender
 
