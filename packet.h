@@ -36,7 +36,7 @@ typedef struct PACKET {
   unsigned int packet_num;
   unsigned int packet_length;
   unsigned int checksum;
-  char data[978];
+  char data[DATA_SIZE];
 } packet_t;
 
 char* serialize_packet(packet_t);
