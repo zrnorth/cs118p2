@@ -25,8 +25,8 @@
 #include "packet.h"
 
 
-// Maximum file name size (bytes).
-const int FILENAME_SIZE = 1024;
+// Maximum file path size (bytes).
+const int PATH_BUFFER_SIZE = 100;
 
 // Prints an error message, and then exits.
 void error(char* msg)
@@ -48,14 +48,7 @@ void connection_handler(int signal)
 // Retrieves the name of the file desired by a request segment.
 char* get_filename(char* request)
 {
-	packet_t pack = deserialize_packet(request);
-
-	int fn_size = pack.packet_length;
-
-	// Copy the filename into a string and return it.
-	char* fn = malloc(fn_size * sizeof(char));
-	strncpy(fn, pack.data, fn_size);
-	return fn;
+	return (request + HEADER_SIZE);
 }
 
 // Response message when file isn't found.
@@ -69,11 +62,9 @@ char* not_found_response(char* request)
 	p_res.type = TYPE_MESSAGE;
 	p_res.packet_num = 0;
 
-	char* msg = "File not found.";
-	p_res.packet_length = sizeof(&msg);
-
-	strcpy(msg, p_res.data);
-
+	char* msg = "We has that file.";
+	p_res.packet_length = strlen(msg) + HEADER_SIZE;
+	strcpy(p_res.data, msg);
 	return serialize_packet(p_res);
 }
 
@@ -89,15 +80,13 @@ char* found_response(char* request)
 	p_res.packet_num = 0;
 
 	char* msg = "We has that file.";
-	p_res.packet_length = sizeof(&msg);
-
-	strcpy(msg, p_res.data);
-
+	p_res.packet_length = strlen(msg) + HEADER_SIZE;
+	strcpy(p_res.data, msg);
 	return serialize_packet(p_res);
 }
 
 // Responds to an request segment by saying whether or not we have the file.
-void handle_request(int sock)
+char* handle_request(int sock)
 {
     // Read the request header.
     int n;
@@ -109,38 +98,34 @@ void handle_request(int sock)
         error("ERROR reading from socket");
     }
 
-    // Print the request message to the console.
-    printf("Request Segment:\n%s\n", request_buffer);
-
     /** Generate the response message **/
     
-    char* response_msg;
+    char* response_msg = malloc(sizeof(packet_t));
 
     // Get the desired file.
     char* filename = get_filename(request_buffer);
-    char filepath[FILENAME_SIZE];
-    getcwd(filepath, FILENAME_SIZE);
-    strcat(filepath, filename);
-    FILE *f = fopen(filepath, "r");
-    
+/*    char filepath_buffer[PATH_BUFFER_SIZE];
+    getcwd(filepath_buffer, PATH_BUFFER_SIZE);
+
+printf("1\n");
+	char* full_path = malloc(strlen(filepath_buffer) + strlen(filename) + 1);
+printf("2\n");
+	strcpy(full_path, filepath_buffer);
+printf("3\n");
+	strcat(full_path, filename);
+*/
+    FILE *f = fopen(filename, "r");
     // File not found. Return 404 message.
     if (f == NULL)
     {
         response_msg = not_found_response(request_buffer);
-        n = write(sock, response_msg, strlen(response_msg));
-		free(response_msg);
-        if (n < 0)
-        {
-            error("ERROR writing to socket");
-        }
+		return response_msg;
     }
     // Generate response message containing file contents.
     else
     {
 		response_msg = found_response(request_buffer);
-		n = write(sock, response_msg, strlen(response_msg));
-		free(response_msg);
-		if (n < 0) { error("ERROR writing to socket"); }
+		return response_msg;
 
 /*
         // Get the size of the file contents.
@@ -220,15 +205,26 @@ int main(int argc, char* argv[])
 	}
 	else
 	{
-		packet_t p = deserialize_packet(buffer);
 
+		packet_t p = deserialize_packet(buffer);
 		printf("Source Port: %d\n", p.source_port);
-		printf("Destination Port: %d\n", p.dest_port);
+		printf("Dest Port: %d\n", p.dest_port);
 		printf("Type: %d\n", p.type);
 		printf("Packet Number: %d\n", p.packet_num);
 		printf("Packet Length: %d\n", p.packet_length);
-		printf("Packet Checksum: %d\n", p.checksum);
+		printf("Checksum: %d\n", p.checksum);
 		printf("Data: %s\n", p.data);
+		
+
+		char* response = handle_request(sockfd);
+		if (sendto(sockfd, response, PACKET_SIZE, 0, &cli_addr, clilen) < 0)
+		{
+			error("ERROR on response sending");
+		}
+		else
+		{
+			printf("Sent Response\n");
+		}
 	}
     //clilen = sizeof(cli_addr);
 
