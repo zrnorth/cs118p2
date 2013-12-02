@@ -23,12 +23,67 @@ void error(char *msg)
     exit(0);
 }
 
+// Sends a packet to the sender process requesting a file.
+// This is the "initial" packet that starts the chain
+void sendRequestPacket(char *filename,
+                       int sockfd,
+                       unsigned int sender_port,
+                       struct sockaddr_in si_sender)
+{
+    // Construct a request packet
+    packet_t request_packet;
+    if (strlen(filename) > DATA_SIZE)
+        error("filename is too long");
+
+    strcpy(request_packet.data, filename);
+    request_packet.packet_length = sizeof(filename) + HEADER_SIZE;
+    request_packet.source_port = RECEIVER_PORT;
+    request_packet.dest_port = sender_port;
+    request_packet.type = TYPE_REQUEST;
+    request_packet.packet_num = 0;
+    request_packet.checksum = 0;
+
+    // Serialize the request packet
+    char* sp = serialize_packet(request_packet);
+
+    // Send the packet to the sender
+    sendto(sockfd, sp, PACKET_SIZE, 0, (struct sockaddr*)&si_sender, sizeof(si_sender));
+
+    // Delete the memory because we don't need it anymore
+    free(sp);
+}
+
+void sendAckPacket(int packet_to_ack,
+                   int sockfd,
+                   unsigned int sender_port,
+                   struct sockaddr_in si_sender)
+{
+    // Construct the ack packet
+    packet_t ack_packet;
+    // the data element in the ack packet is null, because just sending ack
+    ack_packet.packet_length = HEADER_SIZE;
+    ack_packet.source_port = RECEIVER_PORT;
+    ack_packet.dest_port = sender_port;
+    ack_packet.type = TYPE_ACK;
+    ack_packet.packet_num = packet_to_ack;
+    ack_packet.checksum = 0; //TODO implement checksum
+
+    // Serialize the ack packet
+    char *sp = serialize_packet(ack_packet);
+
+    // Send the ack packet
+    sendto(sockfd, sp, PACKET_SIZE, 0, (struct sockaddr*)&si_sender, sizeof(si_sender));
+
+    // Delete the packet memory
+    free(sp);
+}
+
 int main(int argc, char *argv[])
 {
     int sockfd; //Socket descriptor
     int portno, n;
     struct sockaddr_in si_rcvr, si_sender;
-    int slen = sizeof(si_sender);
+
 
     if (argc < 4) {
        fprintf(stderr,"usage %s sender_hostname sender_portnumber filename\n", argv[0]);
@@ -41,38 +96,27 @@ int main(int argc, char *argv[])
     sockfd = socket(AF_INET, SOCK_DGRAM, 0);
     if (sockfd < 0) error("ERROR opening socket.");
 
-    memset((char*) &si_sender, 0, sizeof(si_rcvr));
+    // Setup the connection info, so can connect to sender
+    bzero((char*)&si_sender, sizeof(si_sender));
     si_sender.sin_family = AF_INET;
+    inet_aton(sender_hostname, &si_sender.sin_addr);
     si_sender.sin_port = htons(sender_portnumber);
 
+    // quick check to see if the server exists.
     struct hostent *server; // to get the server info
     server = gethostbyname(sender_hostname);
     if (!server) error("hostname lookup failed");
 
-    // construct the packet
-    struct PACKET request_packet;
-    request_packet.source_port = RECEIVER_PORT;
-    request_packet.dest_port = (unsigned int)sender_portnumber;
-    request_packet.type = TYPE_REQUEST; //requesting a filename
+    // Send the initial request packet
+    sendRequestPacket(filename, sockfd, sender_portnumber, si_sender);
 
-    if (strlen(filename) > DATA_SIZE) // can't fit
-        error("filename is too long");
-    strcpy(request_packet.data, filename); //copy in the data
-
-    request_packet.packet_num = 0; //don't care
-    request_packet.packet_length = sizeof(filename) + HEADER_SIZE; //length of the packet
-    request_packet.checksum = 0; //TODO don't care for now
-
-    char* sp = serialize_packet(request_packet);
-    // now, the request packet is composed. send it to the "sender"
-    //TODO debug
-    printf("%s\n", sp);
-    //end debug
-
-    sendto(sockfd, sp, PACKET_SIZE, 0, (struct sockaddr*) &si_sender, slen);
+    // Now waiting for packet back from sender
 
     char pkt[1000];
-    recvfrom(sockfd, pkt, PACKET_SIZE, 0, &si_sender, &si_sender);
+    socklen_t slen = sizeof(si_sender);
+
+    //Debug: just receive one and print it.
+    recvfrom(sockfd, pkt, PACKET_SIZE, 0, (struct sockaddr*) &si_sender, &slen);
     printf("%s\n", pkt);
 
 
