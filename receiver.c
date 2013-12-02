@@ -134,14 +134,32 @@ int main(int argc, char *argv[])
     char pkt[1000];
     socklen_t slen = sizeof(si_sender);
 
-    //Debug: just receive one and print it.
-    recvfrom(sockfd, pkt, PACKET_SIZE, 0, (struct sockaddr*) &si_sender, &slen);
-    printf("Packet received: %x\n", pkt);
-    packet_t p = deserialize_packet(pkt);
-    printf("Packet length: %i\n", p.packet_length);
-    sendAckPacket(p.packet_num, sockfd, si_sender);
-    putIntoFile(p.packet_length, pkt);
-
+    //Debug: don't check for if it is necessarily good / bad
+    int done = 0;
+    int last_good_rcvd = -1;
+    while (!done)
+    {
+        recvfrom(sockfd, pkt, PACKET_SIZE, 0, (struct sockaddr*) &si_sender, &slen);
+        packet_t p = deserialize_packet(pkt);
+        printf("Packet received: %i\t", p.packet_num);
+        if (p.packet_num == last_good_rcvd + 1) // got a good, in-order packet
+        {
+            last_good_rcvd++;
+            printf("Packet received was in order and valid. Sending ACK\n");
+            sendAckPacket(p.packet_num, sockfd, si_sender);
+            putIntoFile(p.packet_length, pkt);
+            if (p.packet_length < PACKET_SIZE) // only the very last packet is < 1000bytes
+                done = 1;
+        }
+        else // packet is out of order
+        {
+            printf("Packet received was out of order. Sending ACK for pkt %i\n", last_good_rcvd);
+            // Send an ACK packet for the last good one received so sender knows to repeat
+            sendAckPacket(last_good_rcvd, sockfd, si_sender);
+        }
+    }
+    printf("Done!\n");
     close(sockfd);
+    fclose(output_file);
     return 0;
 }

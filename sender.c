@@ -225,14 +225,22 @@ int processFile(char* rcvd_pkt)
 
         getFile(filename);
 
-        // Serve the file, one packet at a time. Return 1 when done
-        // TODO for now just send one packet
-        sendPacket(0);
+        // Serve the file, one packet at a time.
+        // for now we just send them all once, with no going back
+        int base = 0;
+        int next = 0;
+        for (next; next < max_num_pkts; next++)
+        {
+            sendPacket(next);
+        }
     }
     else if (p.type == TYPE_ACK) // acking a packet that was sent
     {
         printf("Received ACK\n");
-        // TODO do nothing for now
+        if (p.packet_num == max_num_pkts-1) // got the last packet
+            return 1;
+
+        //TODO logic for retransmitting here.
     }
     else // wrong packet sent
     {
@@ -289,8 +297,10 @@ int main(int argc, char* argv[])
         {
             printf("done\n");
             reset();
+            break;
         }
     }
+    return 0;
 }
 /*
 		packet_t p = deserialize_packet(buffer);
