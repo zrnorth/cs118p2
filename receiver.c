@@ -1,7 +1,7 @@
 
 /*
- A simple client in the internet domain using TCP
- Usage: ./client hostname port (./client 192.168.0.151 10000)
+ * The receiver sends the request message for a file, recieves message packets containing
+ * the file, and sends ACKs upon each successfully received packet.
  */
 #include <stdio.h>
 #include <sys/types.h>
@@ -10,6 +10,11 @@
 #include <netdb.h>      // define structures like hostent
 #include <stdlib.h>
 #include <strings.h>
+
+#include "packet.h"
+#define RECEIVER_PORT 8080 // for testing and stuff
+
+
 
 void error(char *msg)
 {
@@ -21,49 +26,50 @@ int main(int argc, char *argv[])
 {
     int sockfd; //Socket descriptor
     int portno, n;
-    struct sockaddr_in serv_addr;
-    struct hostent *server; //contains tons of information, including the server's IP address
+    struct sockaddr_in si_rcvr, si_sender;
+    int slen = sizeof(si_sender);
 
     char buffer[256];
-    if (argc < 3) {
-       fprintf(stderr,"usage %s hostname port\n", argv[0]);
+    if (argc < 4) {
+       fprintf(stderr,"usage %s sender_hostname sender_portnumber filename\n", argv[0]);
        exit(0);
     }
 
-    portno = atoi(argv[2]);
-    sockfd = socket(AF_INET, SOCK_STREAM, 0); //create a new socket
-    if (sockfd < 0)
-        error("ERROR opening socket");
+    char* sender_hostname = argv[1];
+    int sender_portnumber = atoi(argv[2]);
+    char* filename = argv[3];
+    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sockfd < 0) error("ERROR opening socket.");
 
-    server = gethostbyname(argv[1]); //takes a string like "www.yahoo.com", and returns a struct hostent which contains information, as IP address, address type, the length of the addresses...
-    if (server == NULL) {
-        fprintf(stderr,"ERROR, no such host\n");
-        exit(0);
-    }
+    memset((char*) &si_sender, 0, sizeof(si_rcvr));
+    si_sender.sin_family = AF_INET;
+    si_sender.sin_port = htons(sender_portnumber);
 
-    memset((char *) &serv_addr, 0, sizeof(serv_addr));
-    serv_addr.sin_family = AF_INET; //initialize server's address
-    bcopy((char *)server->h_addr, (char *)&serv_addr.sin_addr.s_addr, server->h_length);
-    serv_addr.sin_port = htons(portno);
+    struct hostent *server; // to get the server info
+    server = gethostbyname(sender_hostname);
+    if (!server) error("hostname lookup failed");
 
-    if (connect(sockfd,(struct sockaddr *)&serv_addr,sizeof(serv_addr)) < 0) //establish a connection to the server
-        error("ERROR connecting");
+    // construct the packet
+    struct PACKET request_packet;
+    request_packet.source_port = RECEIVER_PORT;
+    request_packet.dest_port = (unsigned int)sender_portnumber;
+    request_packet.type = TYPE_REQUEST; //requesting a filename
 
-    printf("Please enter the message: ");
-    memset(buffer,0, 256);
-    fgets(buffer,255,stdin);	//read message
+    if (sizeof(filename) > sizeof(request_packet.data)) // can't fit
+        error("filename is too long");
+    strncpy(request_packet.data, filename, sizeof(filename)); //copy in the data
 
-    n = write(sockfd,buffer,strlen(buffer)); //write to the socket
-    if (n < 0)
-         error("ERROR writing to socket");
+    request_packet.packet_num = 0; //don't care
+    request_packet.packet_length = sizeof(filename) + HEADER_SIZE; //length of the packet
+    request_packet.checksum = 0; //TODO don't care for now
 
-    memset(buffer,0,256);
-    n = read(sockfd,buffer,255); //read from the socket
-    if (n < 0)
-         error("ERROR reading from socket");
-    printf("%s\n",buffer);	//print server's response
+    char* sp = serialize_packet(request_packet);
+    // now, the request packet is composed. send it to the "sender"
+    //TODO debug
+    printf("%s\n", sp);
+    //end debug
 
-    close(sockfd); //close socket
-
+    sendto(sockfd, sp, PACKET_SIZE, 0, (struct sockaddr*) &si_sender, slen);
+    close(sockfd);
     return 0;
 }
