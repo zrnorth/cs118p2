@@ -48,7 +48,9 @@ void connection_handler(int signal)
 // Retrieves the name of the file desired by a request segment.
 char* get_filename(char* request)
 {
-	return (request + HEADER_SIZE);
+	packet_t p = deserialize_packet(request);
+
+	return p.data;
 }
 
 // Response message when file isn't found.
@@ -86,24 +88,15 @@ char* found_response(char* request)
 }
 
 // Responds to an request segment by saying whether or not we have the file.
-char* handle_request(int sock)
+char* handle_request(char* request)
 {
-    // Read the request header.
-    int n;
-    char request_buffer[PACKET_SIZE];
-    bzero(request_buffer, PACKET_SIZE);
-    n = read(sock, request_buffer, PACKET_SIZE - 1);
-    if (n < 0)
-    {
-        error("ERROR reading from socket");
-    }
 
     /** Generate the response message **/
     
-    char* response_msg = malloc(sizeof(packet_t));
+    char* response_msg = malloc(PACKET_SIZE);
 
     // Get the desired file.
-    char* filename = get_filename(request_buffer);
+    char* filename = get_filename(request);
 /*    char filepath_buffer[PATH_BUFFER_SIZE];
     getcwd(filepath_buffer, PATH_BUFFER_SIZE);
 
@@ -118,13 +111,13 @@ printf("3\n");
     // File not found. Return 404 message.
     if (f == NULL)
     {
-        response_msg = not_found_response(request_buffer);
+        response_msg = not_found_response(request);
 		return response_msg;
     }
     // Generate response message containing file contents.
     else
     {
-		response_msg = found_response(request_buffer);
+		response_msg = found_response(request);
 		return response_msg;
 
 /*
@@ -205,7 +198,7 @@ int main(int argc, char* argv[])
 	}
 	else
 	{
-
+/*
 		packet_t p = deserialize_packet(buffer);
 		printf("Source Port: %d\n", p.source_port);
 		printf("Dest Port: %d\n", p.dest_port);
@@ -214,9 +207,9 @@ int main(int argc, char* argv[])
 		printf("Packet Length: %d\n", p.packet_length);
 		printf("Checksum: %d\n", p.checksum);
 		printf("Data: %s\n", p.data);
-		
+*/		
 
-		char* response = handle_request(sockfd);
+		char* response = handle_request(buffer);
 		if (sendto(sockfd, response, PACKET_SIZE, 0, &cli_addr, clilen) < 0)
 		{
 			error("ERROR on response sending");
