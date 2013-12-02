@@ -66,7 +66,7 @@ char* not_found_response(char* request)
 
 	p_res.source_port = p_req.dest_port;
 	p_res.dest_port = p_req.source_port;
-	p_res.type = 1;
+	p_res.type = TYPE_MESSAGE;
 	p_res.packet_num = 0;
 
 	char* msg = "File not found.";
@@ -85,7 +85,7 @@ char* found_response(char* request)
 
 	p_res.source_port = p_req.dest_port;
 	p_res.dest_port = p_req.source_port;
-	p_res.type = 1;
+	p_res.type = TYPE_MESSAGE;
 	p_res.packet_num = 0;
 
 	char* msg = "We has that file.";

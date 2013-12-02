@@ -16,18 +16,19 @@ char* serialize_packet(packet_t p)
 	sprintf(temp, "%d", p.dest_port);
 	strncpy(buf+4, temp, 4);
 
-	buf[8] = p.type;
+	sprintf(temp, "%d", p.type);
+	strncpy(buf+8, temp, 4);
 
 	sprintf(temp, "%d", p.packet_num);
-	strncpy(buf+9, temp, 4);
+	strncpy(buf+12, temp, 4);
 
 	sprintf(temp, "%d", p.packet_length);
-	strncpy(buf+13, temp, 4);
+	strncpy(buf+16, temp, 4);
 
 	sprintf(temp, "%d", p.checksum);
-	strncpy(buf+17, temp, 4);
+	strncpy(buf+20, temp, 4);
 
-	strncpy(buf+21, p.data, DATA_SIZE);
+	strncpy(buf+24, p.data, DATA_SIZE);
 	return buf;
 }
 
@@ -42,18 +43,19 @@ packet_t deserialize_packet(char* s)
 	strncpy(buf, s+4, 4);
 	p.dest_port = atoi(buf);
 
-	p.type = s[8];
+	strncpy(buf, s+8, 4);
+	p.type = atoi(buf);
 
-	strncpy(buf, s+9, 4);
+	strncpy(buf, s+12, 4);
 	p.packet_num = atoi(buf);
 
-	strncpy(buf, s+13, 4);
+	strncpy(buf, s+16, 4);
 	p.packet_length = atoi(buf);
 
-	strncpy(buf, s+17, 4);
+	strncpy(buf, s+20, 4);
 	p.checksum = atoi(buf);
 
-	strcpy(s+21, p.data);
+	strcpy(s+24, p.data);
 
 	return p;
 }
