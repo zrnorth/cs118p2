@@ -128,6 +128,7 @@ void handle_request(int sock)
     {
         response_msg = not_found_response(request_buffer);
         n = write(sock, response_msg, strlen(response_msg));
+		free(response_msg);
         if (n < 0)
         {
             error("ERROR writing to socket");
@@ -138,6 +139,7 @@ void handle_request(int sock)
     {
 		response_msg = found_response(request_buffer);
 		n = write(sock, response_msg, strlen(response_msg));
+		free(response_msg);
 		if (n < 0) { error("ERROR writing to socket"); }
 
 /*
