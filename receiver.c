@@ -30,7 +30,6 @@ int main(int argc, char *argv[])
     struct sockaddr_in si_rcvr, si_sender;
     int slen = sizeof(si_sender);
 
-    char buffer[256];
     if (argc < 4) {
        fprintf(stderr,"usage %s sender_hostname sender_portnumber filename\n", argv[0]);
        exit(0);
@@ -71,6 +70,12 @@ int main(int argc, char *argv[])
     //end debug
 
     sendto(sockfd, sp, PACKET_SIZE, 0, (struct sockaddr*) &si_sender, slen);
+
+    char pkt[1000];
+    recvfrom(sockfd, pkt, PACKET_SIZE, 0, &si_sender, &si_sender);
+    printf("%s\n", pkt);
+
+
     close(sockfd);
     return 0;
 }
