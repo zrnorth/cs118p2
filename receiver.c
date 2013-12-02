@@ -56,7 +56,7 @@ int main(int argc, char *argv[])
     request_packet.dest_port = (unsigned int)sender_portnumber;
     request_packet.type = TYPE_REQUEST; //requesting a filename
 
-    if (sizeof(filename) > sizeof(request_packet.data)) // can't fit
+    if (strlen(filename) > DATA_SIZE) // can't fit
         error("filename is too long");
     strcpy(request_packet.data, filename); //copy in the data
 
