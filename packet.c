@@ -10,22 +10,22 @@ char* serialize_packet(packet_t p)
 	char* buf = malloc(PACKET_SIZE);
 
 	char temp[4];
-	sprintf(temp, "%d", p.source_port);
+	sprintf(temp, "%04x", p.source_port);
 	strncpy(buf, temp, 4);
 
-	sprintf(temp, "%d", p.dest_port);
+	sprintf(temp, "%04x", p.dest_port);
 	strncpy(buf+4, temp, 4);
 
-	sprintf(temp, "%d", p.type);
+	sprintf(temp, "%04x", p.type);
 	strncpy(buf+8, temp, 4);
 
-	sprintf(temp, "%d", p.packet_num);
+	sprintf(temp, "%04x", p.packet_num);
 	strncpy(buf+12, temp, 4);
 
-	sprintf(temp, "%d", p.packet_length);
+	sprintf(temp, "%04x", p.packet_length);
 	strncpy(buf+16, temp, 4);
 
-	sprintf(temp, "%d", p.checksum);
+	sprintf(temp, "%04x", p.checksum);
 	strncpy(buf+20, temp, 4);
 
 	strncpy(buf+24, p.data, DATA_SIZE);

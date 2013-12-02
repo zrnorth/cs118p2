@@ -9,6 +9,7 @@
 #include <netinet/in.h>
 #include <netdb.h>      // define structures like hostent
 #include <stdlib.h>
+#include <string.h>
 #include <strings.h>
 
 #include "packet.h"
@@ -57,7 +58,7 @@ int main(int argc, char *argv[])
 
     if (sizeof(filename) > sizeof(request_packet.data)) // can't fit
         error("filename is too long");
-    strncpy(request_packet.data, filename, sizeof(filename)); //copy in the data
+    strcpy(request_packet.data, filename); //copy in the data
 
     request_packet.packet_num = 0; //don't care
     request_packet.packet_length = sizeof(filename) + HEADER_SIZE; //length of the packet
