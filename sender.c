@@ -220,7 +220,15 @@ int main(int argc, char* argv[])
 	}
 	else
 	{
-		printf("Received Data: %s\n", buffer);
+		packet_t p = deserialize_packet(buffer);
+
+		printf("Source Port: %d\n", p.source_port);
+		printf("Destination Port: %d\n", p.dest_port);
+		printf("Type: %d\n", p.type);
+		printf("Packet Number: %d\n", p.packet_num);
+		printf("Packet Length: %d\n", p.packet_length);
+		printf("Packet Checksum: %d\n", p.checksum);
+		printf("Data: %s\n", p.data);
 	}
     //clilen = sizeof(cli_addr);
 

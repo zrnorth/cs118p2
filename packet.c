@@ -55,7 +55,6 @@ packet_t deserialize_packet(char* s)
 	strncpy(buf, s+20, 4);
 	p.checksum = atoi(buf);
 
-	strcpy(s+24, p.data);
-
+	strcpy(p.data, s+24);
 	return p;
 }
