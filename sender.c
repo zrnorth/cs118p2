@@ -22,8 +22,11 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 
-// Size of the buffer used to read request message header.
-const int REQUEST_BUFFER_SIZE = 1024;
+#include "packet.h"
+
+
+// Maximum file name size (bytes).
+const int FILENAME_SIZE = 1024;
 
 // Prints an error message, and then exits.
 void error(char* msg)
@@ -42,117 +45,72 @@ void connection_handler(int signal)
     }
 }
 
-// Retrieves the name of the file desired by an HTTP request.
+// Retrieves the name of the file desired by a request segment.
 char* get_filename(char* request)
 {
-    // Ignore the request up to the first space.
-    int pos = 0;
-    while (request[pos] != ' ')
-    {
-        pos++;
-    }
+	packet_t pack = deserialize_packet(request);
 
-    // Find the start of the file name (a slash).
-    while (request[pos] != '/')
-    {
-        pos++;
-    }
+	int fn_size = pack.packet_length;
 
-    char* start_pos = request + pos;
-    int length = 0;
-
-    // Get the file name.
-    while (request[pos] != ' ')
-    {
-        pos++;
-        length++;
-    }
-    char* filename = malloc(length * sizeof(char));
-    strncpy(filename, start_pos, length);
-    return filename;
+	// Copy the filename into a string and return it.
+	char* fn = malloc(fn_size * sizeof(char));
+	strncpy(fn, pack.data, fn_size);
+	return fn;
 }
 
-// Gets the extension of a file.
-char* get_file_extension(char* filename)
+// Response message when file isn't found.
+char* not_found_response(char* request)
 {
-    // Find last '.' character.
-    char* start = strrchr(filename, '.');
-    // Longer than necessary, but oh well.
-    char* extension = malloc(strlen(filename));
+	packet_t p_req = deserialize_packet(request);
+	packet_t p_res;
 
-    // Copy everything after '.' into extension.
-    strcpy(extension, start);
-    return extension;
+	p_res.source_port = p_req.dest_port;
+	p_res.dest_port = p_req.source_port;
+	p_res.type = 1;
+	p_res.packet_num = 0;
+
+	char* msg = "File not found.";
+	p_res.packet_length = sizeof(&msg);
+
+	strcpy(msg, p_res.data);
+
+	return serialize_packet(p_res);
 }
 
-// Returns the proper Content-Type header line for an HTTP response given
-// the file extension of the requested file.
-char* get_content_type(char* ext)
+// Response message when file is found.
+char* found_response(char* request)
 {
-    char* type = "Content-Type: text/plain\r\n";
-    
-    if (strcmp(ext, ".html") == 0 || strcmp(ext, ".htm") == 0)
-    {
-        type = "Content-Type: text/html\r\n";
-    }
-    else if (strcmp(ext, ".jpg") == 0 || strcmp(ext, ".jpeg") == 0)
-    {
-        type = "Content-Type: image/jpeg\r\n";
-    }
-    else if (strcmp(ext, ".gif") == 0)
-    {
-        type = "Content-Type: image/gif\r\n";
-    }
+	packet_t p_req = deserialize_packet(request);
+	packet_t p_res;
 
-    return type;
+	p_res.source_port = p_req.dest_port;
+	p_res.dest_port = p_req.source_port;
+	p_res.type = 1;
+	p_res.packet_num = 0;
+
+	char* msg = "We has that file.";
+	p_res.packet_length = sizeof(&msg);
+
+	strcpy(msg, p_res.data);
+
+	return serialize_packet(p_res);
 }
 
-// Creates the response message for a 404 error.
-char* create_404_response()
-{
-    // Generate required headers and such.
-    char* status = "HTTP/1.1 404 Not Found\r\n";
-    char* body = "<html><head><title>404</title></head><body><h1>404 Not Found</h1></body></html>";
-    char* length_1 = "Content-Length: ";
-    char length_2[10];
-    sprintf(length_2, "%d", strlen(body));
-    char* length_3 = "\r\n";
-    char* type = "Content-Type: text/html\r\n\r\n";
-
-    // Allocate space for total response.
-    char* response = malloc(strlen(status) +
-                            strlen(length_1) +
-                            strlen(length_2) +
-                            strlen(length_3) +
-                            strlen(type) +
-                            strlen(body));
-
-    // Copy status, headers, and body into response.
-    strcpy(response, status);
-    strcat(response, length_1);
-    strcat(response, length_2);
-    strcat(response, length_3);
-    strcat(response, type);
-    strcat(response, body);
-
-    return response;
-}
-
-// Responds to an HTTP request the appropriate HTTP response.
-void handle_http_request(int sock)
+// Responds to an request segment by saying whether or not we have the file.
+void handle_request(int sock)
 {
     // Read the request header.
     int n;
-    char request_buffer[REQUEST_BUFFER_SIZE];
-    bzero(request_buffer, REQUEST_BUFFER_SIZE);
-    n = read(sock, request_buffer, REQUEST_BUFFER_SIZE - 1);
+    char request_buffer[PACKET_SIZE];
+    bzero(request_buffer, PACKET_SIZE);
+    n = read(sock, request_buffer, PACKET_SIZE - 1);
     if (n < 0)
     {
         error("ERROR reading from socket");
     }
 
     // Print the request message to the console.
-    printf("HTTP Request Message:\n%s\n", request_buffer);
+    printf("Request Segment:\n%s\n", request_buffer);
 
     /** Generate the response message **/
     
@@ -160,15 +118,15 @@ void handle_http_request(int sock)
 
     // Get the desired file.
     char* filename = get_filename(request_buffer);
-    char filepath[256];
-    getcwd(filepath, 256);
+    char filepath[FILENAME_SIZE];
+    getcwd(filepath, FILENAME_SIZE);
     strcat(filepath, filename);
     FILE *f = fopen(filepath, "r");
     
     // File not found. Return 404 message.
     if (f == NULL)
     {
-        response_msg = create_404_response();
+        response_msg = not_found_response(request_buffer);
         n = write(sock, response_msg, strlen(response_msg));
         if (n < 0)
         {
@@ -178,6 +136,11 @@ void handle_http_request(int sock)
     // Generate response message containing file contents.
     else
     {
+		response_msg = found_response(request_buffer);
+		n = write(sock, response_msg, strlen(response_msg));
+		if (n < 0) { error("ERROR writing to socket"); }
+
+/*
         // Get the size of the file contents.
         fseek(f, 0, SEEK_END);          // Find end of file.
         size_t file_size = ftell(f);    // Get size.
@@ -205,6 +168,7 @@ void handle_http_request(int sock)
         {
             error("ERROR writing file contents");
         }
+*/
     }
 }
 
@@ -226,7 +190,7 @@ int main(int argc, char* argv[])
     }
 
     // Connect to a socket.
-    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
     if (sockfd < 0)
     {
         error("ERROR opening socket");
@@ -258,7 +222,7 @@ int main(int argc, char* argv[])
         error("ERROR on signal action");
     }
 
-    // Receive incoming connections, and fork new processes for them.
+    // Receive incoming request segments, and fork new processes for them.
     while (1)
     {
         newsockfd = accept(sockfd, (struct sockaddr*) &cli_addr, &clilen);
@@ -273,12 +237,11 @@ int main(int argc, char* argv[])
             error("ERROR on fork");
         }
 
-        // The child process generates the HTTP response for its request and
-        // then exits.
+        // The child process generates the response segment for eaach request.
         if (pid == 0)
         {
             close(sockfd);
-            handle_http_request(newsockfd);
+            handle_request(newsockfd);
             exit(0);
         }
         // The parent does not need the new socket, so closes it.
