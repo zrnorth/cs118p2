@@ -24,12 +24,12 @@
 
 #define PACKET_SIZE   1000
 #define HEADER_SIZE   21 // size of the non-data elements of a packet
+#define DATA_SIZE (PACKET_SIZE - HEADER_SIZE)
 #define TYPE_REQUEST  0
 #define TYPE_MESSAGE  1
 #define TYPE_ACK      2
 
-
-struct PACKET {
+typedef struct PACKET {
   unsigned int source_port;
   unsigned int dest_port;
   char type;
@@ -37,4 +37,7 @@ struct PACKET {
   unsigned int packet_length;
   unsigned int checksum;
   char data[978];
-};
+} packet_t;
+
+char* serialize_packet(packet_t);
+packet_t deserialize_packet(char*);
