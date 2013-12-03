@@ -82,10 +82,6 @@ void putIntoFile(int length, char* raw_pkt)
         // get 1 byte at a time and write to file
         char byte = *(raw_pkt + i);
 
-        //TODO debug
-        printf("%c\n", byte);
-        //end TODO
-
         fprintf(output_file, "%c", byte);
         fflush(stdout); //just in case
     }
