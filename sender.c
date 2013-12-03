@@ -42,6 +42,9 @@ int sockfd, newsockfd, portno, pid;
 socklen_t clilen;
 struct sockaddr_in serv_addr, cli_addr;
 
+int cwnd; // Number of packets allowed to be sent without receiving an ACK.
+int current_window; // Number of packets we have sent without receiving an ACK.
+
 // helper function
 int min(int a, int b)
 {
@@ -126,12 +129,18 @@ int processFile(char* rcvd_pkt)
         int next = 0;
         for (next; next < max_num_pkts; next++)
         {
+			if (current_window >= cwnd)
+			{
+				return 0;
+			}
             sendPacket(next);
+			current_window++;
         }
     }
     else if (p.type == TYPE_ACK) // acking a packet that was sent
     {
         printf("Received ACK\n");
+		current_window--;
         if (p.packet_num == max_num_pkts-1) // got the last packet
             return 1;
 
@@ -156,9 +165,16 @@ int main(int argc, char* argv[])
     // Make sure the arguments are correctly supplied.
     if (argc < 2)
     {
-        fprintf(stderr, "ERROR, no port provided\n");
+        fprintf(stderr, "ERROR: proper usage -\n./sender <port_number> [cwnd] [p_l] [p_c]\n");
         exit(1);
     }
+
+	// Set the window size based on given argument, or 10 by default.
+	cwnd = 10;
+	if (argc >= 3)
+	{
+		cwnd = argv[3];
+	}
 
     // Connect to a socket.
     sockfd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -178,11 +194,9 @@ int main(int argc, char* argv[])
         error("ERROR on binding");
     }
 
-    // Only listen on up to 5 processes at a time.
-    //listen(sockfd, 5);
-
     int finishedTransmitting;
 	char* buffer[PACKET_SIZE];
+	current_window = 0;
     clilen = sizeof(cli_addr);
 	while(1)
 	{
