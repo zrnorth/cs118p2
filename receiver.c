@@ -148,7 +148,8 @@ int main(int argc, char *argv[])
             printf("Packet received was in order and valid. Sending ACK\n");
             sendAckPacket(p.packet_num, sockfd, si_sender);
             putIntoFile(p.packet_length, pkt);
-            if (p.packet_length < PACKET_SIZE) // only the very last packet is < 1000bytes
+            //if (p.packet_length < PACKET_SIZE) // only the very last packet is < 1000bytes
+			if (p.type == TYPE_END_OF_FILE)
                 done = 1;
         }
         else // packet is out of order
