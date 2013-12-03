@@ -17,15 +17,16 @@
     12-15       Checksum          Validity checksum. The server compares each sent message's
                                   checksum with the ACK's computed checksum to determine
                                   if the message was received correctly.
-    26-999      Data              The actual data in the packet.
+    16-999      Data              The actual data in the packet.
 */
 
-#define PACKET_SIZE   1000
-#define HEADER_SIZE   16 // size of the non-data elements of a packet
+#define PACKET_SIZE      1000
+#define HEADER_SIZE      16 // size of the non-data elements of a packet
 #define DATA_SIZE (PACKET_SIZE - HEADER_SIZE)
-#define TYPE_REQUEST  0
-#define TYPE_MESSAGE  1
-#define TYPE_ACK      2
+#define TYPE_REQUEST  	 0
+#define TYPE_MESSAGE  	 1
+#define TYPE_ACK      	 2
+#define TYPE_END_OF_FILE 3
 
 typedef struct PACKET {
   unsigned int type;

@@ -57,12 +57,20 @@ void sendPacket(int packet_num)
     p.packet_num = packet_num;
     p.checksum = 0; // todo
 
+	int offset = packet_num * DATA_SIZE;
     // need to get the length of the packet (usually 1000, unless last pkt.)
-    size_t length = min(DATA_SIZE, file_size - (packet_num * DATA_SIZE));
+    size_t length = min(DATA_SIZE, file_size - offset);
     // copy in the data
-    memcpy(p.data, file_buffer+(packet_num * DATA_SIZE), length);
+    memcpy(p.data, file_buffer + offset, length);
 
     p.packet_length = length + HEADER_SIZE;
+
+	// If the number of bytes sent so far exceeds the number of bytes in the
+	// file, then indicate that this is the last packet.
+	if (offset + length >= file_size)
+	{
+		p.type = TYPE_END_OF_FILE;
+	}
 
     // Serialize the packet to be sent
     char* sp = serialize_packet(p);
